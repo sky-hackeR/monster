@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Creature Animation with Circular Motion and Repulsion</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+class Segment {
+    constructor(x, y, length, angle = 0) {
+        this.x = x;
+        this.y = y;
+        this.length = length;
+        this.angle = angle;
+        this.relAngle = 0;
+        this.size = 5;
+    }
+
+    updateRelative(iter, flex) {
+        this.relAngle += (Math.random() - 0.5) * 0.1; // Randomized movement
+        this.angle += this.relAngle * flex;
+
+        this.size += Math.sin(Date.now() / 1000) * 0.1; // Segment growth or shrink
+    }
+
+    follow(targetX, targetY) {
+        let dx = targetX - this.x;
+        let dy = targetY - this.y;
+        this.angle = Math.atan2(dy, dx);
+
+        let dist = Math.sqrt(dx * dx + dy * dy);
+        this.x = targetX - Math.cos(this.angle) * this.length;
+        this.y = targetY - Math.sin(this.angle) * this.length;
+
+        this.updateRelative(dist, 0.05); // Adding flexibility
+    }
+
+    draw(parentX, parentY) {
+        ctx.strokeStyle = 'hsl(' + (Math.atan2(this.y - parentY, this.x - parentX) * 180 / Math.PI) + ', 100%, 50%)'; // Dynamic color change
+        ctx.lineWidth = this.size;
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(parentX, parentY);
+        ctx.stroke();
+    }
+}
+
+class Creature {
+    constructor(x, y, segments, orbitRadius, orbitSpeed) {
+        this.x = x;
+        this.y = y;
+        this.segments = [];
+
+        this.orbitRadius = orbitRadius;
+        this.orbitSpeed = orbitSpeed;
+        this.angle = 0;
+
+        let length = 20;
+        for (let i = 0; i < segments; i++) {
+            this.segments.push(new Segment(x, y, length));
+        }
+    }
+
+    updateCircularMotion(centerX, centerY) {
+        this.angle += this.orbitSpeed;
+
+        this.x = centerX + this.orbitRadius * Math.cos(this.angle);
+        this.y = centerY + this.orbitRadius * Math.sin(this.angle);
+    }
+
+    repel(mouseX, mouseY) {
+        let dx = this.x - mouseX;
+        let dy = this.y - mouseY;
+        let distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < 100) { // Repel when cursor is within 100 pixels
+            let force = 100 / distance;
+            this.x += dx * force * 0.1;
+            this.y += dy * force * 0.1;
+        }
+    }
+
+    follow() {
+        for (let i = this.segments.length - 1; i >= 0; i--) {
+            if (i === 0) {
+                this.segments[i].follow(this.x, this.y);
+            } else {
+                this.segments[i].follow(this.segments[i - 1].x, this.segments[i - 1].y);
+            }
+        }
+    }
+
+    draw() {
+        for (let i = 0; i < this.segments.length - 1; i++) {
+            this.segments[i].draw(this.segments[i + 1].x, this.segments[i + 1].y);
+        }
+    }
+}
+
+const centerX = canvas.width / 2;
+const centerY = canvas.height / 2;
+
+const creatures = [];
+for (let i = 0; i < 3; i++) {
+    creatures.push(new Creature(centerX, centerY, 10, 150 + i * 50, 0.02 + i * 0.01));
+}
+
+const Input = {
+    mouse: { x: centerX, y: centerY }
+};
+
+canvas.addEventListener('mousemove', function(e) {
+    Input.mouse.x = e.clientX;
+    Input.mouse.y = e.clientY;
+});
+
+function animate() {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'; // Trail effect
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    creatures.forEach(creature => {
+        creature.updateCircularMotion(centerX, centerY);
+        creature.repel(Input.mouse.x, Input.mouse.y);
+        creature.follow();
+        creature.draw();
+    });
+
+    requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+</body>
+</html>
